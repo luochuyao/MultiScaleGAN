@@ -16,6 +16,8 @@ from model.FullConv import *
 from util.utils import *
 from datetime import datetime
 from data.radar_sequence_iterator import SequenceRadarDataIterator
+from scipy.misc import *
+
 
 class SequenceBaseModel(object):
     def __init__(self,
@@ -231,7 +233,7 @@ class SequenceModel(SequenceBaseModel):
     def save_model(self,model_name = None):
 
         model_fold = os.path.join(self.base_path,self.info['MODEL_SAVE_DIR'])
-
+        print('the model path is: ',model_fold)
         if not os.path.exists(model_fold):
             os.mkdir(model_fold)
         else:
@@ -250,6 +252,7 @@ class SequenceModel(SequenceBaseModel):
 
     # loading model
     def load_model(self,model_name = None):
+
         model_fold = os.path.join(self.base_path,self.info['MODEL_SAVE_DIR'])
         if not os.path.exists(model_fold):
             raise ('the path of model is null')
@@ -303,7 +306,41 @@ class SequenceModel(SequenceBaseModel):
         MSE = MSE / count
         return MSE
 
-    # evaluate the model in terms of MSE
+
+    def read_files(self, path_list):
+        imgs = []
+        for path in path_list:
+            img = imread(path)
+            imgs.append(img)
+        imgs = np.array(imgs)
+        imgs[imgs > 80] = 0
+        imgs[imgs < 15] = 0
+        imgs = normalization(imgs)
+        imgs = imgs[np.newaxis, :, :, :, np.newaxis]
+        return imgs
+
+    def classic_test(self,path_list):
+        assert len(path_list)==14
+        test_batch = self.read_files(path_list)
+        cur_input = test_batch[:,:4,:,:,:,]
+        img_outs = []
+        for img_index in range(10):
+            test_output = self.sess.run(
+                        self.test_output_frames,
+                        feed_dict={
+                            self.test_input_frames: cur_input,
+                        }
+                    )
+            img_outs.append(test_output[0, :, :, 0])
+            test_output = test_output[:, np.newaxis, :, :, :, ]
+            cur_input = np.concatenate([cur_input[:, -3:, :, :, :], test_output], axis=1)
+        img_outs = np.array(img_outs)
+        img_outs = denormalization(img_outs)
+        img_outs[img_outs>80] = 0
+        img_outs[img_outs<15] = 0
+
+        return img_outs
+
     def test(self):
 
         count = 0
@@ -338,6 +375,10 @@ class SequenceModel(SequenceBaseModel):
                 mse = np.mean(np.square(tars-img_out))
                 MSE = MSE+mse
                 count = count+1
+
+                # img_out = denormalization(img_out)
+                # img_out[img_out > 80] = 0
+                # img_out[img_out < 15] = 0
 
         MSE = MSE/count
 
@@ -410,6 +451,9 @@ if __name__ == '__main__':
             width=900
         )
 
+
+
+    print('configuration[NAME] is:',str(configuration['NAME']))
     # Initialize the model
     model = SequenceModel(
         name=configuration['NAME'],
@@ -424,6 +468,10 @@ if __name__ == '__main__':
         test_batch_size=configuration['TESTING']['BATCH_SIZE']
     )
 
-    model.train()
+    # model.train()
+    model.load_model()
+    # model.classic_test()
+    # model.test()
+
 
 

@@ -15,6 +15,7 @@ import math
 from util import ops
 from util.utils import *
 from datetime import datetime
+from scipy.misc import *
 from data.radar_sequence_iterator import SequenceRadarDataIterator
 
 def log10(t):
@@ -294,7 +295,8 @@ class MutilScaleCNN(object):
 
     # loading model
     def load_model(self, model_name=None):
-        model_fold = os.path.join(self.base_path, self.info['MODEL_SAVE_DIR'])
+        model_fold = '/home/ices/PycharmProject/multi_scale_gan/model_lib/multi_scale_cnn_model_lib/radar/'
+        # model_fold = os.path.join(self.base_path, self.info['MODEL_SAVE_DIR'])
         if not os.path.exists(model_fold):
             raise ('the path of model is null')
         else:
@@ -343,9 +345,45 @@ class MutilScaleCNN(object):
                 mse = np.mean(np.square(tars - img_out))
                 MSE = MSE + mse
                 count = count + 1
+
+
         MSE = MSE / count
         return MSE
 
+    def read_files(self, path_list):
+        imgs = []
+        for path in path_list:
+            img = imread(path)
+            imgs.append(img)
+        imgs = np.array(imgs)
+        imgs[imgs > 80] = 0
+        imgs[imgs < 15] = 0
+        imgs = normalization(imgs)
+        imgs = imgs.transpose((1, 2, 0))[np.newaxis, :, :, :, ]
+        return imgs
+
+    def classic_test(self, path_list):
+        assert len(path_list) == 14
+        test_batch = self.read_files(path_list)
+        cur_input = test_batch[:, :, :, :4]
+        cur_input[cur_input > 80] = 0
+        cur_input[cur_input < 15] = 0
+        cur_input = normalization(cur_input)
+        img_outs = []
+        for img_index in range(10):
+            test_output = self.sess.run(
+                self.test_scale_preds[-1],
+                feed_dict={
+                    self.test_input_frame: cur_input,
+                }
+            )
+            img_outs.append(test_output[0, :, :, 0])
+            cur_input = np.concatenate([cur_input[:, :, :, -3:], test_output], axis=3)
+        img_outs = np.array(img_outs)
+        img_outs = denormalization(img_outs)
+        img_outs[img_outs > 80] = 0
+        img_outs[img_outs < 15] = 0
+        return img_outs
     # valid the model in terms of MSE
     def valid(self):
         count = 0
@@ -424,4 +462,8 @@ if __name__ == '__main__':
         valid_iter= valid_data_iterator,
         info = configuration,
     )
-    model.train()
+    # model.train()
+    model.load_model()
+    model.temp_test()
+    # model.classic_test()
+    # model.test()

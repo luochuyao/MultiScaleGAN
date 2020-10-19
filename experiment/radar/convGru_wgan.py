@@ -14,6 +14,7 @@ from loss.loss_functions import *
 from util.ops import *
 from data.radar_sequence_iterator import SequenceRadarDataIterator
 import yaml
+from scipy.misc import *
 from model.FullConvRNN import *
 from model.FullConv import *
 from util.utils import *
@@ -265,6 +266,7 @@ class SequenceModel(SequenceBaseModel):
 
     # loading model
     def load_model(self, model_name=None):
+        # model_fold = '/home/ices/PycharmProject/new_test_MultiScaleGAN/save_model_lib/conv_gru_wgan_model_lib/radar/'
         model_fold = os.path.join(self.base_path, self.info['MODEL_SAVE_DIR'])
         if not os.path.exists(model_fold):
             raise ('the path of model is null')
@@ -354,10 +356,10 @@ class SequenceModel(SequenceBaseModel):
                         dtype=tf.float32,
                         activate='relu'
                     )
-
             fake = preds[:int(batch_size/2),:]
             true = preds[int(batch_size/2):,:]
             return fake,true
+
 
     # valid the model in terms of MSE
     def valid(self):
@@ -396,6 +398,39 @@ class SequenceModel(SequenceBaseModel):
         MSE = MSE / count
         return MSE
 
+    def read_files(self, path_list):
+        imgs = []
+        for path in path_list:
+            img = imread(path)
+            imgs.append(img)
+        imgs = np.array(imgs)
+        imgs[imgs > 80] = 0
+        imgs[imgs < 15] = 0
+        imgs = normalization(imgs)
+        imgs = imgs[np.newaxis, :, :, :, np.newaxis]
+        return imgs
+
+    def classic_test(self, path_list):
+        assert len(path_list) == 14
+        test_batch = self.read_files(path_list)
+        cur_input = test_batch[:, :4, :, :, :, ]
+        img_outs = []
+        for img_index in range(10):
+            test_output = self.sess.run(
+                self.test_output_frames,
+                feed_dict={
+                    self.test_input_frames: cur_input,
+                }
+            )
+            img_outs.append(test_output[0, :, :, 0])
+            test_output = test_output[:, np.newaxis, :, :, :, ]
+            cur_input = np.concatenate([cur_input[:, -3:, :, :, :], test_output], axis=1)
+        img_outs = np.array(img_outs)
+        img_outs = denormalization(img_outs)
+        img_outs[img_outs > 80] = 0
+        img_outs[img_outs < 15] = 0
+
+        return img_outs
     # evaluate the model in terms of MSE
     def test(self):
 
@@ -537,4 +572,6 @@ if __name__ == '__main__':
         test_batch_size=configuration['TESTING']['BATCH_SIZE']
     )
 
-    model.train()
+    # model.train()
+    model.load_model()
+    model.temp_test()

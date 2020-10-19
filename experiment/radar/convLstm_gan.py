@@ -13,6 +13,7 @@ from loss.loss_functions import *
 from util.ops import *
 from data.radar_sequence_iterator import SequenceRadarDataIterator
 import yaml
+from scipy.misc import imread,imsave
 from model.FullConvRNN import *
 from model.FullConv import *
 from util.utils import *
@@ -271,9 +272,43 @@ class SequenceModel(SequenceBaseModel):
             )
         print('model saved')
 
+    def read_files(self, path_list):
+        imgs = []
+        for path in path_list:
+            img = imread(path)
+            imgs.append(img)
+        imgs = np.array(imgs)
+        imgs[imgs > 80] = 0
+        imgs[imgs < 15] = 0
+        imgs = normalization(imgs)
+        imgs = imgs[np.newaxis, :, :, :, np.newaxis]
+        return imgs
+
+    def classic_test(self, path_list):
+        assert len(path_list) == 14
+        test_batch = self.read_files(path_list)
+        cur_input = test_batch[:, :4, :, :, :, ]
+        img_outs = []
+        for img_index in range(10):
+            test_output = self.sess.run(
+                self.test_output_frames,
+                feed_dict={
+                    self.test_input_frames: cur_input,
+                }
+            )
+            img_outs.append(test_output[0, :, :, 0])
+            test_output = test_output[:, np.newaxis, :, :, :, ]
+            cur_input = np.concatenate([cur_input[:, -3:, :, :, :], test_output], axis=1)
+        img_outs = np.array(img_outs)
+        img_outs = denormalization(img_outs)
+        img_outs[img_outs > 80] = 0
+        img_outs[img_outs < 15] = 0
+
+        return img_outs
     # loading model
     def load_model(self,model_name = None):
         model_fold = os.path.join(self.base_path,self.info['MODEL_SAVE_DIR'])
+        # model_fold = '/home/ices/PycharmProject/new_test_MultiScaleGAN/save_model_lib/conv_lstm_gan_model_lib/radar/'
         if not os.path.exists(model_fold):
             raise ('the path of model is null')
         else:
@@ -442,6 +477,32 @@ class SequenceModel(SequenceBaseModel):
                 MSE = MSE + mse
                 count = count + 1
 
+                from scipy.misc import imread
+                img_out = denormalization(img_out)
+                img_out[img_out > 80] = 0
+                img_out[img_out < 15] = 0
+                root_path = '/mnt/A/meteorological/2500_ref_seq/convLstm_gan_/201803192000/process_0/predict/'
+                files = os.listdir(root_path)
+                files.sort()
+                imgs = []
+                for file in files:
+                    path = os.path.join(root_path, file)
+                    img = imread(path)
+                    imgs.append(img)
+
+                for t in range(10):
+                    cur_t_img = imgs[t]
+                    cur_t_out_img = img_out[t]
+                    for h in range(700):
+                        for w in range(900):
+                            if cur_t_img[h, w] == cur_t_out_img[h, w]:
+                                pass
+                            else:
+                                print('mis match', str(cur_t_img[h, w]), str(cur_t_out_img[h, w]))
+
+                break
+            break
+
         MSE = MSE / count
 
         return MSE
@@ -543,4 +604,5 @@ if __name__ == '__main__':
         test_batch_size=configuration['TESTING']['BATCH_SIZE']
     )
 
-    model.train()
+    # model.train()
+    model.load_model()
