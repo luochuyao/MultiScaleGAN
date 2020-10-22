@@ -1,4 +1,4 @@
- MultiScaleGAN
+ #MultiScaleGAN
 
 The source code of paper:
 "Experimental Study on Generative Adversarial Network for Precipitation Nowcasting"
