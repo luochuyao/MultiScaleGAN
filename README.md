@@ -1,4 +1,4 @@
- #MultiScaleGAN
+ # MultiScaleGAN
 
 The source code of paper:
 "Experimental Study on Generative Adversarial Network for Precipitation Nowcasting"
@@ -27,7 +27,7 @@ The range of data is 0~255 and the value of 255 presents the default value. Henc
 
 
 # About Model
-It is difficult to train the model. Therefore, we offer the all models directly this week.
+It is difficult to train the model. Therefore, we offer the all models and you can download it following this address [model_libs_link](http://39.97.217.145/model_lib/)
 
 
 # About maintaining
